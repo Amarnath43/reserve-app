@@ -3,8 +3,8 @@ const cors = require("cors");
 const morgan = require("morgan");
 
 const authRoutes = require("./routes/auth.routes");
-// const reservationRoutes = require("./routes/reservation.routes");
-// const availabilityRoutes = require("./routes/availability.routes");
+const reservationRoutes = require("./routes/reservation.routes");
+const availabilityRoutes = require("./routes/availability.routes");
 // const adminRoutes = require("./routes/admin.routes");
 
 const errorHandler = require("./middlewares/error.middleware");
@@ -21,8 +21,8 @@ if (process.env.NODE_ENV !== "production") {
 
 // /* -------------------- Routes -------------------- */
 app.use("/api/auth", authRoutes);
-// app.use("/api/reservations", reservationRoutes);
-// app.use("/api/availability", availabilityRoutes);
+app.use("/api/reservations", reservationRoutes);
+app.use("/api/availability", availabilityRoutes);
 // app.use("/api/admin", adminRoutes);
 
 /* -------------------- Health Check -------------------- */
