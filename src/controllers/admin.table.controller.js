@@ -68,6 +68,7 @@ const updateTable = async (req, res, next) => {
 const disableTable = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { isActive } = req.body;
 
     const table = await Table.findById(id);
     if (!table) {
@@ -76,7 +77,7 @@ const disableTable = async (req, res, next) => {
       throw err;
     }
 
-    table.isActive = false;
+    table.isActive = isActive;
     await table.save();
 
     return res.json({ message: "Table disabled successfully" });

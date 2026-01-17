@@ -6,6 +6,7 @@ const CAPACITY_TOLERANCE = 1;
 const getAvailability = async (req, res, next) => {
   try {
     const { date, timeSlot, guests } = req.body;
+    const guestCount = parseInt(guests, 10);
 
     if (!date || !timeSlot || !guests) {
       const err = new Error("date, timeSlot and guests are required");
@@ -17,8 +18,8 @@ const getAvailability = async (req, res, next) => {
     const eligibleTables = await Table.find({
       isActive: true,
       capacity: {
-        $gte: guests,
-        $lte: guests + CAPACITY_TOLERANCE,
+        $gte: guestCount,
+        $lte: guestCount + CAPACITY_TOLERANCE,
       },
     }).lean();
 

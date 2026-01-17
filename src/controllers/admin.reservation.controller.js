@@ -5,87 +5,64 @@ const Table = require("../models/Table");
 
 const getAllReservations = async (req, res, next) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      status,
-      search,
-      date,
-    } = req.query;
+    const { page = 1, limit = 10, status, search, date } = req.query;
 
+    /* ---------------- 1. Build Filter for the Table ---------------- */
     const filter = {};
+    if (status) filter.status = status;
+    if (date) filter.date = date;
 
-    /* ---------------- Status filter ---------------- */
-    if (status) {
-      filter.status = status;
-    }
-
-    /* ---------------- Date filter ---------------- */
-    if (date) {
-      filter.date = date; // YYYY-MM-DD
-    }
-
-    /* ---------------- Search filter ---------------- */
     if (search) {
-  const orConditions = [];
+      const orConditions = [];
+      const users = await User.find({ email: { $regex: search, $options: "i" } }).select("_id");
+      if (users.length) orConditions.push({ userId: { $in: users.map(u => u._id) } });
 
-  // Search by user email
-  const users = await User.find({
-    email: { $regex: search, $options: "i" },
-  }).select("_id");
+      if (!isNaN(search)) {
+        const tables = await Table.find({ tableNumber: Number(search) }).select("_id");
+        if (tables.length) orConditions.push({ tableId: { $in: tables.map(t => t._id) } });
+      }
 
-  if (users.length) {
-    orConditions.push({ userId: { $in: users.map(u => u._id) } });
-  }
-
-  // Search by table number
-  if (!isNaN(search)) {
-    const tables = await Table.find({
-      tableNumber: Number(search),
-    }).select("_id");
-
-    if (tables.length) {
-      orConditions.push({ tableId: { $in: tables.map(t => t._id) } });
+      if (!orConditions.length) {
+        // Return empty table data but STILL include global stats below
+        return res.json(await getResponseWithStats([], 0, page, limit));
+      }
+      filter.$or = orConditions;
     }
-  }
 
-  // 🔴 THIS IS THE FIX
-  if (!orConditions.length) {
-    return res.json({
-      data: [],
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: 0,
-        totalPages: 0,
-      },
-    });
-  }
-
-  filter.$or = orConditions;
-}
-
-
-    /* ---------------- Pagination ---------------- */
+    /* ---------------- 2. Fetch Paginated Data & Global Stats ---------------- */
     const skip = (page - 1) * limit;
 
-    const [reservations, total] = await Promise.all([
+    const [reservations, total, totalAll, confirmedCount, cancelledCount, activeTablesCount] = await Promise.all([
+      // Paginated table data
       Reservation.find(filter)
         .populate("userId", "name email")
-        .populate("tableId", "tableNumber capacity specialRequest")
+        .populate("tableId", "tableNumber capacity")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
-
+      
+      // Count for the current filters (for pagination)
       Reservation.countDocuments(filter),
+
+      // GLOBAL STATS (No filter applied)
+      Reservation.countDocuments({}), 
+      Reservation.countDocuments({ status: "CONFIRMED" }),
+      Reservation.countDocuments({ status: "CANCELLED" }),
+      Table.countDocuments({ isActive: true })
     ]);
 
     return res.json({
       data: reservations,
+      stats: {
+        total: totalAll,
+        confirmed: confirmedCount,
+        cancelled: cancelledCount,
+        activeTables: activeTablesCount
+      },
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total,
+        total, // Total matching the filter
         totalPages: Math.ceil(total / limit),
       },
     });
